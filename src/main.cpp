@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "WiFi.h"
 #include "esp_wifi.h"
-#include "HTTPClient.h"
+#include "HTTPClient.h"//for sending http requests
 #include <ArduinoJson.h>//for servicing json files
 #define LED_BUILTIN 2
 #define GPIO 15
@@ -9,6 +9,9 @@
 #define AP_SSID "HADO_ESP32"
 #define AP_PASS "HADOboi21"
 WiFiClient Wifi1;
+String serverIP="192.168.4.2:5000";
+unsigned long lastTime = 0;
+unsigned long delayTime=1000;//1s to check data in database
 
 void PrintStations();
 void setup() {
@@ -32,11 +35,52 @@ void loop() {
   delay(3000);
 }
 
-
-void Authenticate(wifi_sta_info_t station)
+void send_request()
 {
 
+
+
+
+
+  //HTTP request code:
+   if ((millis() - lastTime) > delayTime) {
+    //Check WiFi connection status
+    if(WiFi.status()== WL_CONNECTED){
+      HTTPClient http;
+
+      String serverPath = serverIP + "?temperature=36.00";
+      
+      // Your Domain name with URL path or IP address with path
+      http.begin(serverPath.c_str());
+      
+      // Send HTTP GET request
+      int httpResponseCode = http.GET();
+      
+      if (httpResponseCode>0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println(payload);
+      }
+      else {
+        Serial.print("Error code: ");
+        Serial.println(httpResponseCode);
+      }
+      // Free resources
+      http.end();
+    }
+    else {
+      Serial.println("WiFi Disconnected");
+    }
+    lastTime = millis();
+  }
 }
+
+
+// void Authenticate(wifi_sta_info_t station)
+// {
+
+// }
 
 void PrintStations(){
   wifi_sta_list_t stationList;
