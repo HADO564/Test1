@@ -10,13 +10,15 @@
 #define AP_SSID "HADO_ESP32"
 #define AP_PASS "HADOboi21"
 WiFiClient Wifi1;
-String serverIP = "192.168.4.2:5000";
+const char* serverIP = "192.168.4.2:5000";
 String dataBase_MAC = "d4:25:8b:71:17:db";
 unsigned long lastTime = 0;
 unsigned long delayTime = 1000; // 1s to check data in database
+String id="";
+bool pass;
 void PrintStations();
-void send_request();
-void authenticate(String reqMacAdd);
+String send_request();
+bool authenticate(String reqMacAdd);
 
 void setup()
 {
@@ -46,17 +48,22 @@ String mac2String(byte ar[])
 void loop()
 {
   // PrintStations();
-  send_request();
-  digitalWrite(LED_BUILTIN, HIGH);
-  digitalWrite(GPIO, LOW);
-  delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
-  digitalWrite(GPIO, HIGH);
-  delay(2000);
+  id=send_request();
+  pass=authenticate(id);
+  delay(3000);
+  if(pass)
+  {
+    digitalWrite(LED_BUILTIN,HIGH);
+    digitalWrite(GPIO,LOW);
+    delay(3000);
+  }
+  digitalWrite(LED_BUILTIN,LOW);
+  digitalWrite(GPIO,HIGH);
+  pass=false;
   delay(3000);
 }
 
-void send_request()
+String send_request()
 {
   // extracting list of stations connected to esp32
   wifi_sta_list_t stationList;
@@ -88,48 +95,78 @@ void send_request()
       continue;
     }
     else
-      reqmAdd=macAdd;
+      reqmAdd = macAdd;
     macAdd = "";
   }
 
-  Serial.println("-----------------");
-
+  return reqmAdd;
 }
 
-void authenticate (String reqMacAdd)
+String httpGETRequest(const char* serverName) {
+  WiFiClient client;
+  HTTPClient http;
+    
+  // Your Domain name with URL path or IP address with path
+  http.begin(client, serverName);
+  
+  // Send HTTP POST request
+  int httpResponseCode = http.GET();
+  
+  String payload = "{}"; 
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+
+  return payload;
+}
+
+bool authenticate(String reqMacAdd)
 {
-
-
-  //HTTP request code:
-   if ((millis() - lastTime) > delayTime) {
+  bool valid =false;
+  String response="";
+  // HTTP request code:
+  if ((millis() - lastTime) > delayTime) {
     //Check WiFi connection status
     if(WiFi.status()== WL_CONNECTED){
-      HTTPClient http;
-
-      String serverPath = serverIP + "/validate/" +reqMacAdd;
-      
-      // Domain name with URL path or IP address with path
-      http.begin(serverPath.c_str());
-      
-      // Send HTTP GET request
-      int httpResponseCode = http.GET();
-      
-      if (httpResponseCode>0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-        String payload = http.getString();
-        Serial.println(payload);
-        if(payload=="valid")
-        {
-          
-        }
+              
+      response = httpGETRequest(serverIP);
+      Serial.println(response);
+      JSONVar myObject = JSON.parse(response);
+  
+      // JSON.typeof(jsonVar) can be used to get the type of the var
+      if (JSON.typeof(myObject) == "undefined") {
+        Serial.println("Parsing input failed!");
+        return;
       }
-      else {
-        Serial.print("Error code: ");
-        Serial.println(httpResponseCode);
+    
+      Serial.print("JSON object = ");
+      Serial.println(myObject);
+    
+      // myObject.keys() can be used to get an array of all the keys in the object
+      JSONVar keys = myObject.keys();
+    
+      for (int i = 0; i < keys.length(); i++) {
+        JSONVar value = myObject[keys[i]];
+        Serial.print(keys[i]);
+        Serial.print(" = ");
+        Serial.println(value);
+        responseArr[i] = double(value);
       }
-      // Free resources
-      http.end();
+      Serial.print("1 = ");
+      Serial.println(sensorReadingsArr[0]);
+      Serial.print("2 = ");
+      Serial.println(sensorReadingsArr[1]);
+      Serial.print("3 = ");
+      Serial.println(sensorReadingsArr[2]);
     }
     else {
       Serial.println("WiFi Disconnected");
@@ -137,39 +174,6 @@ void authenticate (String reqMacAdd)
     lastTime = millis();
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // void PrintStations(){
 //   wifi_sta_list_t stationList;
