@@ -2,7 +2,7 @@
 #include "WiFi.h"
 #include "esp_wifi.h"
 #include "HTTPClient.h"  //for sending http requests
-#include <ArduinoJson.h> //for servicing json files
+#include <Arduino_JSON.h> //for servicing json files
 #include <vector>
 #define LED_BUILTIN 2
 #define GPIO 15
@@ -10,7 +10,7 @@
 #define AP_SSID "HADO_ESP32"
 #define AP_PASS "HADOboi21"
 WiFiClient Wifi1;
-const char* serverIP = "192.168.4.2:5000";
+const char* serverIP = "192.168.4.2:5000/validate/";
 String dataBase_MAC = "d4:25:8b:71:17:db";
 unsigned long lastTime = 0;
 unsigned long delayTime = 1000; // 1s to check data in database
@@ -102,12 +102,12 @@ String send_request()
   return reqmAdd;
 }
 
-String httpGETRequest(const char* serverName) {
+String httpGETRequest(const char* serverName,String MacAdd) {
   WiFiClient client;
   HTTPClient http;
-    
+  String serverPath = serverIP + MacAdd
   // Your Domain name with URL path or IP address with path
-  http.begin(client, serverName);
+  http.begin(client, serverPath);
   
   // Send HTTP POST request
   int httpResponseCode = http.GET();
@@ -137,19 +137,19 @@ bool authenticate(String reqMacAdd)
   if ((millis() - lastTime) > delayTime) {
     //Check WiFi connection status
     if(WiFi.status()== WL_CONNECTED){
-              
-      response = httpGETRequest(serverIP);
+      response = httpGETRequest(serverIP,reqMacAdd);
       Serial.println(response);
-      JSONVar myObject = JSON.parse(response);
+    
+      JSONVar obj = JSON.parse(response);
   
-      // JSON.typeof(jsonVar) can be used to get the type of the var
-      if (JSON.typeof(myObject) == "undefined") {
+      
+      if(JSON.typeof(obj == "undefined") {
         Serial.println("Parsing input failed!");
         return;
       }
     
       Serial.print("JSON object = ");
-      Serial.println(myObject);
+      Serial.println(obj);
     
       // myObject.keys() can be used to get an array of all the keys in the object
       JSONVar keys = myObject.keys();
@@ -159,14 +159,7 @@ bool authenticate(String reqMacAdd)
         Serial.print(keys[i]);
         Serial.print(" = ");
         Serial.println(value);
-        responseArr[i] = double(value);
       }
-      Serial.print("1 = ");
-      Serial.println(sensorReadingsArr[0]);
-      Serial.print("2 = ");
-      Serial.println(sensorReadingsArr[1]);
-      Serial.print("3 = ");
-      Serial.println(sensorReadingsArr[2]);
     }
     else {
       Serial.println("WiFi Disconnected");
@@ -175,30 +168,3 @@ bool authenticate(String reqMacAdd)
   }
 }
 
-// void PrintStations(){
-//   wifi_sta_list_t stationList;
-
-//   esp_wifi_ap_get_sta_list(&stationList);
-
-//   Serial.print("Number of connected stations: ");
-//   Serial.println(stationList.num);
-
-//   for(int i = 0; i < stationList.num; i++) {
-
-//     wifi_sta_info_t station = stationList.sta[i];
-
-//     for(int j = 0; j< 6; j++){
-//       char str[3];
-
-//       sprintf(str, "%02x", (int)station.mac[j]);
-//       Serial.print(str);
-
-//       if(j<5){
-//         Serial.print(":");
-//       }
-//     }
-//     Serial.println();
-//   }
-
-//   Serial.println("-----------------");
-// }
