@@ -4,18 +4,19 @@
 #include "HTTPClient.h"  //for sending http requests
 #include <Arduino_JSON.h> //for servicing json files
 #include <vector>
+#include<ESPmDNS.h>
 #define LED_BUILTIN 2
 #define GPIO 15
 #define SERIAL_SPEED 115200
 #define AP_SSID "HADO_ESP32"
 #define AP_PASS "HADOboi21"
 WiFiClient Wifi1;
-const char* serverIP = "192.168.4.2:5000/validate/";
+const char* serverIP = "http://192.168.4.2:5000/validate/";
 String dataBase_MAC = "d4:25:8b:71:17:db";
 unsigned long lastTime = 0;
 unsigned long delayTime = 1000; // 1s to check data in database
 String id="";
-bool pass;
+bool pass=false;
 void PrintStations();
 String send_request();
 bool authenticate(String reqMacAdd);
@@ -48,19 +49,22 @@ String mac2String(byte ar[])
 void loop()
 {
   // PrintStations();
+  delay(6000);
   id=send_request();
+  Serial.println(id);
+  if(id!="")
   pass=authenticate(id);
-  delay(3000);
+  delay(500);
   if(pass)
   {
     digitalWrite(LED_BUILTIN,HIGH);
     digitalWrite(GPIO,LOW);
-    delay(3000);
+    delay(5000);
   }
   digitalWrite(LED_BUILTIN,LOW);
   digitalWrite(GPIO,HIGH);
   pass=false;
-  delay(3000);
+  delay(5000);
 }
 
 String send_request()
@@ -72,8 +76,10 @@ String send_request()
 
   Serial.print("Number of connected stations: ");
   Serial.println(stationList.num);
-  String macAdd;
-  String reqmAdd;
+  String macAdd="";
+  String reqmAdd="";
+  if (stationList.num>0)
+  {
   for (int i = 0; i < stationList.num; i++)
   {
 
@@ -92,26 +98,27 @@ String send_request()
     }
     if (macAdd == dataBase_MAC)
     {
+      macAdd="";
       continue;
     }
     else
       reqmAdd = macAdd;
     macAdd = "";
   }
-
+  }
   return reqmAdd;
 }
 
 String httpGETRequest(const char* serverName,String MacAdd) {
   WiFiClient client;
   HTTPClient http;
-  String serverPath = serverIP + MacAdd
+  String serverPath = serverIP + MacAdd;
+  Serial.println(serverPath);
   // Your Domain name with URL path or IP address with path
-  http.begin(client, serverPath);
+  http.begin(serverPath);
   
   // Send HTTP POST request
   int httpResponseCode = http.GET();
-  
   String payload = "{}"; 
   
   if (httpResponseCode>0) {
@@ -135,35 +142,36 @@ bool authenticate(String reqMacAdd)
   String response="";
   // HTTP request code:
   if ((millis() - lastTime) > delayTime) {
-    //Check WiFi connection status
-    if(WiFi.status()== WL_CONNECTED){
+  //   //Check WiFi connection status
       response = httpGETRequest(serverIP,reqMacAdd);
-      Serial.println(response);
     
-      JSONVar obj = JSON.parse(response);
+    //   JSONVar obj = JSON.parse(response);
   
-      
-      if(JSON.typeof(obj == "undefined") {
-        Serial.println("Parsing input failed!");
-        return;
+      if(response=="valid")
+      {
+        return true;
       }
+      return false;
+    //   // if(JSON.typeof(obj == "undefined")) {
+    //   //   Serial.println("Parsing input failed!");
+    //   //   return;
+    //   // }
     
-      Serial.print("JSON object = ");
-      Serial.println(obj);
+    //   Serial.print("JSON object = ");
+    //   Serial.println(obj);
     
-      // myObject.keys() can be used to get an array of all the keys in the object
-      JSONVar keys = myObject.keys();
+    //   // myObject.keys() can be used to get an array of all the keys in the object
+    //   JSONVar keys = obj.keys();
     
-      for (int i = 0; i < keys.length(); i++) {
-        JSONVar value = myObject[keys[i]];
-        Serial.print(keys[i]);
-        Serial.print(" = ");
-        Serial.println(value);
-      }
-    }
-    else {
-      Serial.println("WiFi Disconnected");
-    }
+    //   for (int i = 0; i < keys.length(); i++) {
+    //     JSONVar value = obj[keys[i]];
+    //     Serial.print(keys[i]);
+    //     Serial.print(" = ");
+    //     Serial.println(value);
+    // }
+    // else {
+    //   Serial.println("WiFi Disconnected");
+    // }
     lastTime = millis();
   }
 }
