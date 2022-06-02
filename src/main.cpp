@@ -3,23 +3,25 @@
 #include "esp_wifi.h"
 #include "HTTPClient.h"  //for sending http requests
 #include <Arduino_JSON.h> //for servicing json files
-#include <vector>
-#include<ESPmDNS.h>
+//Macros
 #define LED_BUILTIN 2
 #define GPIO 15
 #define SERIAL_SPEED 115200
 #define AP_SSID "HADO_ESP32"
 #define AP_PASS "HADOboi21"
+//globals
 WiFiClient Wifi1;
 const char* serverIP = "http://192.168.4.2:5000/validate/";
 String dataBase_MAC = "d4:25:8b:71:17:db";
 unsigned long lastTime = 0;
 unsigned long delayTime = 1000; // 1s to check data in database
 String id="";
+//functions
 bool pass=false;
 void PrintStations();
 String send_request();
 bool authenticate(String reqMacAdd);
+String mac2string(byte ar[]);
 
 void setup()
 {
@@ -32,31 +34,18 @@ void setup()
   Serial.println(WiFi.softAPIP());
 }
 
-String mac2String(byte ar[])
-{
-  String s;
-  for (byte i = 0; i < 6; ++i)
-  {
-    char buf[3];
-    sprintf(buf, "%02X", ar[i]); // J-M-L: slight modification, added the 0 in the format for padding
-    s += buf;
-    if (i < 5)
-      s += ':';
-  }
-  return s;
-}
-
 void loop()
 {
-  // PrintStations();
-  delay(6000);
-  id=send_request();
-  Serial.println(id);
+  time_t now = time(0); 
+  delay(5000);//wait 5 seconds after boot to allow connection to server
+  id=send_request();//find the MAC_address of the device that is used to access
   if(id!="")
   pass=authenticate(id);
   delay(500);
   if(pass)
   {
+    Serial.println("Access granted to " );
+    Serial.println(id);
     digitalWrite(LED_BUILTIN,HIGH);
     digitalWrite(GPIO,LOW);
     delay(5000);
@@ -96,7 +85,7 @@ String send_request()
         macAdd += ':';
       }
     }
-    if (macAdd == dataBase_MAC)
+    if (macAdd == dataBase_MAC)//removes db mac address from list
     {
       macAdd="";
       continue;
@@ -114,10 +103,10 @@ String httpGETRequest(const char* serverName,String MacAdd) {
   HTTPClient http;
   String serverPath = serverIP + MacAdd;
   Serial.println(serverPath);
-  // Your Domain name with URL path or IP address with path
+  // IP address plus route
   http.begin(serverPath);
   
-  // Send HTTP POST request
+  // Send HTTP get request
   int httpResponseCode = http.GET();
   String payload = "{}"; 
   
@@ -142,16 +131,34 @@ bool authenticate(String reqMacAdd)
   String response="";
   // HTTP request code:
   if ((millis() - lastTime) > delayTime) {
-  //   //Check WiFi connection status
       response = httpGETRequest(serverIP,reqMacAdd);
     
-    //   JSONVar obj = JSON.parse(response);
   
       if(response=="valid")
       {
         return true;
       }
       return false;
+    lastTime = millis();
+  }
+}
+//converts mac_address from esp32 station list to string. the mac_address is originally in uint8_t format
+String mac2String(byte ar[])
+{
+  String s;
+  for (byte i = 0; i < 6; ++i)
+  {
+    char buf[3];
+    sprintf(buf, "%02X", ar[i]); // J-M-L: slight modification, added the 0 in the format for padding
+    s += buf;//add the two digits from the buffer to the string
+    if (i < 5)
+      s += ':';//add a colon to make it appear like a MAC address
+  }
+  return s;
+}
+
+//code for handling json objects
+    //   JSONVar obj = JSON.parse(response);
     //   // if(JSON.typeof(obj == "undefined")) {
     //   //   Serial.println("Parsing input failed!");
     //   //   return;
@@ -172,7 +179,3 @@ bool authenticate(String reqMacAdd)
     // else {
     //   Serial.println("WiFi Disconnected");
     // }
-    lastTime = millis();
-  }
-}
-
